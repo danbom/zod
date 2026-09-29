@@ -1012,7 +1012,10 @@ export function parsedType(data: unknown): errors.$ZodInvalidTypeExpected {
   const t = typeof data;
   switch (t) {
     case "number": {
-      return Number.isNaN(data) ? "nan" : "number";
+      if (Number.isNaN(data)) return "nan";
+      // Report Infinity/-Infinity literally so every locale's "received" is informative
+      if (!Number.isFinite(data)) return String(data);
+      return "number";
     }
     case "object": {
       if (data === null) {
