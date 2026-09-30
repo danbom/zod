@@ -22,6 +22,8 @@ test("parsedType", () => {
   expect(parsedType(doubleNullPrototype)).toBe("object");
 
   expect(parsedType(Number.NaN)).toBe("nan");
+  expect(parsedType(Number.POSITIVE_INFINITY)).toBe("Infinity");
+  expect(parsedType(Number.NEGATIVE_INFINITY)).toBe("-Infinity");
 });
 
 test("locales - tr", () => {
