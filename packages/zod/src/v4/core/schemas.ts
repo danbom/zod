@@ -2440,7 +2440,8 @@ function handleUnionResults(results: ParsePayload[], final: ParsePayload, inst: 
   const nonaborted = results.filter((r) => !util.aborted(r));
   if (nonaborted.length === 1) {
     final.value = nonaborted[0].value;
-    return nonaborted[0];
+    final.issues.push(...nonaborted[0].issues);
+    return final;
   }
 
   final.issues.push({
@@ -2505,7 +2506,11 @@ export const $ZodUnion: core.$constructor<$ZodUnion> = /*@__PURE__*/ core.$const
         results.push(result);
         async = true;
       } else {
-        if (result.issues.length === 0) return result;
+        if (result.issues.length === 0) {
+          // Return through `payload` so issues the caller already attached survive, e.g. a strictObject's unrecognized_keys carried across a pipe.
+          payload.value = result.value;
+          return payload;
+        }
         results.push(result);
       }
     }
