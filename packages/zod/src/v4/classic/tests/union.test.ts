@@ -308,3 +308,41 @@ test("z.discriminatedUnion with empty options constructs and rejects", () => {
     expect((obj.error.issues[0] as any).options).toEqual([]);
   }
 });
+
+// A pipe forwards a strictObject's unrecognized_keys into its output schema (so an enclosing intersection can reconcile them). A union in that position used to hand back the matching option's own payload and drop them. https://github.com/colinhacks/zod/issues/6636
+test("a union inside a pipe keeps the incoming unrecognized_keys", () => {
+  const schema = z
+    .strictObject({ a: z.string() })
+    .pipe(z.union([z.object({ a: z.literal("x") }), z.object({ a: z.string() })]));
+
+  expect(schema.parse({ a: "x" })).toEqual({ a: "x" });
+  expect(schema.safeParse({ a: "x", extra: 1 })).toMatchObject({
+    success: false,
+    error: { issues: [{ code: "unrecognized_keys", keys: ["extra"], path: [] }] },
+  });
+});
+
+test("a union inside a pipe keeps the incoming unrecognized_keys (async)", async () => {
+  const schema = z
+    .strictObject({ a: z.string() })
+    .pipe(z.union([z.object({ a: z.literal("x") }).refine(async () => true), z.object({ a: z.string() })]));
+
+  await expect(schema.parseAsync({ a: "x" })).resolves.toEqual({ a: "x" });
+  await expect(schema.safeParseAsync({ a: "x", extra: 1 })).resolves.toMatchObject({
+    success: false,
+    error: { issues: [{ code: "unrecognized_keys", keys: ["extra"], path: [] }] },
+  });
+});
+
+test("a union inside a pipe keeps the incoming unrecognized_keys when only one option is non-aborted", () => {
+  // The first option aborts (invalid_type on `b`); the second only fails a continuing refinement, so the union reports that single non-aborted result.
+  const schema = z
+    .strictObject({ a: z.string() })
+    .pipe(
+      z.union([z.object({ a: z.string(), b: z.string() }), z.object({ a: z.string() }).refine(() => false, "nope")])
+    );
+
+  const result = schema.safeParse({ a: "x", extra: 1 });
+  expect(result.success).toBe(false);
+  expect(result.error!.issues.map((i) => i.code)).toEqual(["unrecognized_keys", "custom"]);
+});
